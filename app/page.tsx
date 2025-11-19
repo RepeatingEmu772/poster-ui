@@ -1,65 +1,74 @@
-import Image from "next/image";
+"use client";
+
+import { Tldraw } from "tldraw";
+import { useAiStore } from "../store/ai";
+
+function AiPanel() {
+  const instruction = useAiStore((s) => s.instruction);
+  const setInstruction = useAiStore((s) => s.setInstruction);
+  const isThinking = useAiStore((s) => s.isThinking);
+  const lastError = useAiStore((s) => s.lastError);
+  const lastInstruction = useAiStore((s) => s.lastInstruction);
+
+  const handleSubmit = () => {
+    if (!instruction.trim() || isThinking) return;
+    // For now this is just a placeholder.
+    // Later you'll call your FastAPI /ai/apply-instruction endpoint from here
+    // or trigger a React Query mutation.
+    console.log("AI instruction submitted:", instruction);
+  };
+
+  return (
+    <aside className="ai-panel">
+      <h1 className="ai-panel-title">
+        AI Poster Assistant
+      </h1>
+      <p className="ai-panel-description">
+        Describe how you want the poster to change. Later this will talk to your
+        FastAPI + LLM backend.
+      </p>
+      <textarea
+        className="ai-panel-textarea"
+        placeholder='e.g. "Add a bold title at the top and make all text white."'
+        value={instruction}
+        onChange={(e) => setInstruction(e.target.value)}
+      />
+      <button
+        className="ai-panel-button"
+        disabled={isThinking || !instruction.trim()}
+        onClick={handleSubmit}
+      >
+        {isThinking ? "Thinking..." : "Apply with AI"}
+      </button>
+
+      {lastError && (
+        <p className="ai-panel-error">Error: {lastError}</p>
+      )}
+
+      {lastInstruction && (
+        <p className="ai-panel-last-instruction">
+          Last instruction: <span className="italic">{lastInstruction}</span>
+        </p>
+      )}
+
+      <div className="ai-panel-footer">
+        Panel is UI-only for now. Next step: wire this to your FastAPI{" "}
+        <code className="ai-panel-code">/ai/apply-instruction</code>{" "}
+        endpoint.
+      </div>
+    </aside>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="main-container">
+      <AiPanel />
+      <div className="canvas-container">
+        <div className="canvas-wrapper">
+          <Tldraw />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

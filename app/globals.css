@@ -1,26 +1,125 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* tldraw default styles */
+@import '@tldraw/tldraw/tldraw.css';
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  overscroll-behavior: none;
+  margin: 0;
+}
+
+/* AI Panel Styles */
+.ai-panel {
+  display: flex;
+  height: 100vh;
+  width: 20rem;
+  flex-direction: column;
+  border-right: 1px solid rgb(30 41 59);
+  background-color: rgba(255, 255, 255, 1);
+  padding: 1rem;
+  color: rgb(0, 0, 0);
+}
+
+.ai-panel-title {
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgb(203 213 225);
+}
+
+.ai-panel-description {
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  color: rgb(148 163 184);
+}
+
+.ai-panel-textarea {
+  margin-bottom: 0.75rem;
+  height: 10rem;
+  width: 100%;
+  resize: none;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(51 65 85);
+  background-color: rgb(2 6 23 / 0.7);
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  outline: none;
+}
+
+.ai-panel-textarea::placeholder {
+  color: rgb(100 116 139);
+}
+
+.ai-panel-button {
+  margin-bottom: 0.5rem;
+  border-radius: 0.375rem;
+  background-color: rgb(16 185 129);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(0 0 0);
+  transition: all 0.15s;
+}
+
+.ai-panel-button:hover:not(:disabled) {
+  background-color: rgb(52 211 153);
+}
+
+.ai-panel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ai-panel-error {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: rgb(248 113 113);
+}
+
+.ai-panel-last-instruction {
+  margin-top: 0.75rem;
+  font-size: 0.625rem;
+  color: rgb(100 116 139);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ai-panel-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  font-size: 0.625rem;
+  color: rgb(100 116 139);
+}
+
+.ai-panel-code {
+  border-radius: 0.25rem;
+  background-color: rgb(30 41 59);
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+/* Main Layout Styles */
+.main-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: rgb(2 6 23);
+  color: rgb(248 250 252);
+}
+
+.canvas-container {
+  position: relative;
+  flex: 1;
+}
+
+.canvas-wrapper {
+  position: absolute;
+  inset: 0;
 }
