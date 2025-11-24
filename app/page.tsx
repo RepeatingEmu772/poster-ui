@@ -7,9 +7,67 @@ import {
   useMutation,
 } from "@tanstack/react-query";
 
-import { Tldraw, Editor, createShapeId, AssetRecordType } from "tldraw";
+import { Tldraw, Editor, createShapeId, AssetRecordType, TLShapeId, toRichText } from "tldraw";
 import { useAiStore } from "../store/ai";
 import { useEditorStore } from "../store/editor";
+import { getCanvasContext, extractJSONFromMarkdown, type AIResponse, type AITextElement } from "../lib/canvas-utils";
+
+// Helper function to map font size to tldraw size
+function mapFontSizeToTldrawSize(fontSize: number): 's' | 'm' | 'l' | 'xl' {
+  if (fontSize <= 16) return 's';
+  if (fontSize <= 24) return 'm';
+  if (fontSize <= 48) return 'l';
+  return 'xl';
+}
+
+// Helper function to map hex/color names to tldraw colors
+function mapColorToTldraw(color: string): 'black' | 'grey' | 'light-violet' | 'violet' | 'blue' | 'light-blue' | 'yellow' | 'orange' | 'green' | 'light-green' | 'light-red' | 'red' | 'white' {
+  const colorLower = color.toLowerCase().replace(/[#\s]/g, '');
+  
+  // Map common hex colors
+  const hexMap: Record<string, any> = {
+    '000000': 'black',
+    '000': 'black',
+    'ffffff': 'white',
+    'fff': 'white',
+    'ff0000': 'red',
+    'f00': 'red',
+    'ff6666': 'light-red',
+    '00ff00': 'green',
+    '0f0': 'green',
+    '66ff66': 'light-green',
+    '0000ff': 'blue',
+    '00f': 'blue',
+    '6666ff': 'light-blue',
+    'ffff00': 'yellow',
+    'ff0': 'yellow',
+    'ffa500': 'orange',
+    '808080': 'grey',
+    'gray': 'grey',
+    'grey': 'grey',
+    '8b00ff': 'violet',
+    'bb88ff': 'light-violet',
+  };
+  
+  // Check hex map
+  if (hexMap[colorLower]) {
+    return hexMap[colorLower];
+  }
+  
+  // Map color names
+  if (colorLower.includes('white')) return 'white';
+  if (colorLower.includes('black')) return 'black';
+  if (colorLower.includes('red')) return colorLower.includes('light') ? 'light-red' : 'red';
+  if (colorLower.includes('green')) return colorLower.includes('light') ? 'light-green' : 'green';
+  if (colorLower.includes('blue')) return colorLower.includes('light') ? 'light-blue' : 'blue';
+  if (colorLower.includes('violet') || colorLower.includes('purple')) return colorLower.includes('light') ? 'light-violet' : 'violet';
+  if (colorLower.includes('yellow')) return 'yellow';
+  if (colorLower.includes('orange')) return 'orange';
+  if (colorLower.includes('grey') || colorLower.includes('gray')) return 'grey';
+  
+  // Default to white for unknown colors
+  return 'white';
+}
 
 function AiPanel({ editor }: { editor: Editor | null }) {
   const instruction = useAiStore((s) => s.instruction);
@@ -28,12 +86,18 @@ function AiPanel({ editor }: { editor: Editor | null }) {
 
   const applyInstructionMutation = useMutation({
     mutationFn: async (instructionText: string) => {
+      // Get current canvas context
+      const canvasContext = editor ? getCanvasContext(editor) : null;
+      
       const res = await fetch("/api/poster-gen", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ instruction: instructionText }),
+        body: JSON.stringify({ 
+          instruction: instructionText,
+          canvasContext: canvasContext,
+        }),
       });
 
       if (!res.ok) {
@@ -43,7 +107,7 @@ function AiPanel({ editor }: { editor: Editor | null }) {
         );
       }
 
-      return res.json();
+      return res.json() as Promise<AIResponse>;
     },
     onMutate: async (instructionText) => {
       setIsThinking(true);
@@ -72,18 +136,41 @@ function AiPanel({ editor }: { editor: Editor | null }) {
       
       console.log("RunPod response:", data);
       
-      // Extract image URL from RunPod response (nested under 'runpod' property)
-      const imageUrl = data?.runpod?.output?.result;
-      
-      console.log("Extracted imageUrl:", imageUrl);
-      console.log("Editor exists:", !!editor);
-      
-      if (imageUrl && editor) {
-        try {
-          // Save the URL to the store
+      if (!editor) {
+        addMessage({
+          role: "assistant",
+          content: "Editor not ready yet",
+          error: true,
+        });
+        return;
+      }
+
+      try {
+        // Check if AI returned a new image to generate
+        // Try both old format (runpod.output.result) and new format (output.result)
+        const imageUrl = data?.output?.result || data?.runpod?.output?.result;
+        
+        console.log("Extracted imageUrl:", imageUrl);
+        
+        // Parse elements from the response
+        let elements = data?.elements || data?.output?.elements;
+        let reasoning = data?.reasoning || data?.output?.reasoning;
+        
+        // If elements are empty but raw exists, try to parse from markdown
+        if ((!elements || elements.length === 0) && data?.output?.raw) {
+          console.log("Parsing elements from raw markdown...");
+          const parsed = extractJSONFromMarkdown(data.output.raw);
+          if (parsed) {
+            elements = parsed.elements;
+            reasoning = parsed.reasoning || reasoning;
+            console.log("Parsed elements:", elements);
+          }
+        }
+        
+        if (imageUrl) {
+          // This is a new image generation (first request)
           setBackgroundUrl(imageUrl);
           
-          // Create an asset ID for the image
           const assetId = AssetRecordType.createId();
           
           // Get image dimensions
@@ -121,7 +208,6 @@ function AiPanel({ editor }: { editor: Editor | null }) {
           const shapeId = createShapeId();
           const viewport = editor.getViewportPageBounds();
           
-          // Calculate dimensions to fit nicely on screen
           const maxWidth = viewport.width * 0.8;
           const maxHeight = viewport.height * 0.8;
           const scale = Math.min(maxWidth / imageWidth, maxHeight / imageHeight, 1);
@@ -140,34 +226,67 @@ function AiPanel({ editor }: { editor: Editor | null }) {
             },
           });
           
-          // Select and zoom to the image
           editor.select(shapeId);
           editor.zoomToSelection();
           
-          // Add success message to chat
           addMessage({
             role: "assistant",
             content: "Poster generated successfully! Image added to canvas.",
           });
-        } catch (error) {
-          console.error("Error loading image:", error);
+        }
+        
+        // Check if AI returned text/shape elements to place on canvas
+        if (elements && elements.length > 0) {
+          const createdShapeIds: TLShapeId[] = [];
+          
+          for (const element of elements) {
+            if (element.type === "text") {
+              const shapeId = createShapeId();
+              
+              // Create text shape with richText (tldraw v4 requirement)
+              editor.createShape({
+                id: shapeId,
+                type: 'text',
+                x: element.position.x,
+                y: element.position.y,
+                props: {
+                  richText: toRichText(element.content),
+                  size: element.style.fontSize ? mapFontSizeToTldrawSize(element.style.fontSize) : 'm',
+                  color: mapColorToTldraw(element.style.color || 'black'),
+                  font: element.style.fontFamily === 'serif' ? 'serif' : 
+                        element.style.fontFamily === 'mono' ? 'mono' : 'sans',
+                  w: element.bounds?.width || 200,
+                  autoSize: !element.bounds?.width, // Auto-size if no width specified
+                  scale: 1,
+                  textAlign: 'start',
+                },
+              });
+              
+              createdShapeIds.push(shapeId);
+            }
+          }
+          
+          if (createdShapeIds.length > 0) {
+            editor.select(...createdShapeIds);
+            
+            addMessage({
+              role: "assistant",
+              content: `Added ${createdShapeIds.length} element(s) to canvas. ${reasoning || ""}`,
+            });
+          }
+        } else if (!imageUrl) {
+          // No image and no elements returned
           addMessage({
             role: "assistant",
-            content: `Failed to load image: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            content: `Response received but no elements to add. ${reasoning || data?.output?.raw || ""}`,
             error: true,
           });
         }
-      } else {
-        // Add error if no image URL found
-        const errorMsg = !imageUrl 
-          ? `No image URL found. Response: ${JSON.stringify(data)}`
-          : "Editor not ready yet";
-        
-        console.error("Error:", errorMsg);
-        
+      } catch (error) {
+        console.error("Error processing AI response:", error);
         addMessage({
           role: "assistant",
-          content: errorMsg,
+          content: `Failed to process response: ${error instanceof Error ? error.message : 'Unknown error'}`,
           error: true,
         });
       }
@@ -235,7 +354,7 @@ function AiPanel({ editor }: { editor: Editor | null }) {
         <div className="chat-input-container">
           <textarea
             className="ai-panel-textarea"
-            placeholder='e.g. "Add a bold title at the top and make all text white."'
+            placeholder='What do u want to create a poster of? or "Describe the text you want to add to the poster."'
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             onKeyDown={handleKeyDown}
